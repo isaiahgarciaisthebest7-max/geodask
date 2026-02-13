@@ -14,59 +14,77 @@ let loop;
 const FLOOR = 40;
 const CEILING = 260;
 
+// -------- INPUT --------
 document.addEventListener("keydown", e => {
     if (e.code === "Space" || e.code === "ArrowUp") {
-        if (running) input();
+        if (running) handleJump();
     }
 });
 
-function input() {
-    if (mode === "cube" && y === FLOOR) velocity = 15;
-    else if (mode === "ship") velocity = 7;
-    else if (mode === "ball") gravity *= -1;
-    else if (mode === "ufo") velocity = 12;
-    else if (mode === "wave") velocity = -velocity || 6;
+function handleJump() {
+
+    if (mode === "cube") {
+        // Only jump if on ground
+        if (y <= FLOOR + 0.1) {
+            velocity = 16;
+        }
+    }
+
+    else if (mode === "ship") {
+        velocity = 8;
+    }
+
+    else if (mode === "ball") {
+        gravity *= -1;
+    }
+
+    else if (mode === "ufo") {
+        velocity = 13;
+    }
+
+    else if (mode === "wave") {
+        velocity = velocity === 8 ? -8 : 8;
+    }
 }
 
+// -------- LEVEL LOAD --------
 function loadLevel(level) {
+
+    clearInterval(loop);
     clearLevel();
-    mode = "cube";
+
     gravity = 0.9;
-    y = FLOOR;
     velocity = 0;
+    y = FLOOR;
+    mode = "cube";
     updateModeDisplay();
 
     createLevel(level);
 
-    statusText.innerText = "Level " + level;
     running = true;
-    loop = setInterval(update, 20);
-}
-
-function restart() {
-    clearInterval(loop);
-    running = false;
-    loadLevel(1);
+    statusText.innerText = "Level " + level;
+    loop = setInterval(update, 16);
 }
 
 function clearLevel() {
-    document.querySelectorAll(".block, .spike, .portal").forEach(e => e.remove());
+    document.querySelectorAll(".spike, .portal").forEach(e => e.remove());
 }
 
+// -------- LEVEL DESIGN --------
 function createLevel(level) {
 
-    let layouts = {
+    const layouts = {
         1: {
-            spikes: [600, 700, 740, 780, 1000],
-            portals: [{pos: 900, type:"ship"}]
+            spikes: [600, 750, 900],
+            portals: [{pos:1000,type:"ship"}]
         },
         2: {
-            spikes: [500, 650, 900, 950, 1000],
-            portals: [{pos: 800, type:"ball"}, {pos:1200, type:"cube"}]
+            spikes: [500, 650, 800, 950],
+            portals: [{pos:1100,type:"ball"}]
         },
         3: {
-            spikes: [550, 600, 650, 1000, 1050],
-            portals: [{pos:750,type:"ufo"},{pos:1300,type:"wave"}]
+            spikes: [550, 600, 650, 900],
+            portals: [{pos:1000,type:"ufo"}]
         }
     };
 
@@ -88,17 +106,26 @@ function createLevel(level) {
     });
 }
 
+// -------- GAME LOOP --------
 function update() {
 
-    velocity -= gravity;
-    y += velocity;
+    // Apply gravity ONLY in relevant modes
+    if (mode === "cube" || mode === "ufo" || mode === "ship") {
+        velocity -= gravity;
+        y += velocity;
+    }
 
-    if (y <= FLOOR) {
+    if (mode === "wave") {
+        y += velocity;
+    }
+
+    // Clamp
+    if (y < FLOOR) {
         y = FLOOR;
         velocity = 0;
     }
 
-    if (y >= CEILING) {
+    if (y > CEILING) {
         y = CEILING;
         velocity = 0;
     }
@@ -106,33 +133,41 @@ function update() {
     player.style.bottom = y + "px";
 
     moveObjects();
-    collisions();
+    checkCollisions();
 }
 
 function moveObjects() {
     document.querySelectorAll(".spike, .portal").forEach(obj => {
-        let left = parseFloat(obj.style.left);
-        obj.style.left = (left - speed) + "px";
+        obj.style.left = (parseFloat(obj.style.left) - speed) + "px";
     });
 }
 
-function collisions() {
+// -------- COLLISIONS --------
+function checkCollisions() {
+
     const p = player.getBoundingClientRect();
 
     document.querySelectorAll(".spike").forEach(spike => {
+
         const r = spike.getBoundingClientRect();
+
+        // Smaller hitbox to prevent false deaths
+        const padding = 10;
+
         if (
-            p.left < r.right &&
-            p.right > r.left &&
-            p.bottom > r.top &&
-            p.top < r.bottom
+            p.left + padding < r.right &&
+            p.right - padding > r.left &&
+            p.bottom - padding > r.top &&
+            p.top + padding < r.bottom
         ) {
             death();
         }
     });
 
     document.querySelectorAll(".portal").forEach(portal => {
+
         const r = portal.getBoundingClientRect();
+
         if (
             p.left < r.right &&
             p.right > r.left &&
@@ -159,5 +194,7 @@ function updateModeDisplay() {
 function death() {
     clearInterval(loop);
     running = false;
+    statusText.innerText = "💀 You Died";
+}
     statusText.innerText = "💀 You Died";
 }
